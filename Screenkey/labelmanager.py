@@ -1,23 +1,27 @@
-# -*- coding: utf-8 -*-
-# "screenkey" is distributed under GNU GPLv3+, WITHOUT ANY WARRANTY.
-# Copyright(c) 2010-2012: Pablo Seminario <pabluk@gmail.com>
-# Copyright(c) 2015-2016: wave++ "Yuri D'Elia" <wavexx@thregr.org>.
+#!/usr/bin/env python3
 
-from __future__ import print_function, unicode_literals, absolute_import, generators
+import gi
+gi.require_version('Gtk', '3.0')
 
-from .inputlistener import InputListener, InputType
-import glib
+from gi.repository import GLib
+
+from inputlistener import InputListener, InputType
 
 from collections import namedtuple
 from datetime import datetime
 
-# Key replacement data:
-#
-# bk_stop: stops backspace processing in baked mode, but not full mode
-#          these keys generally move the caret, and are also padded with a thin space
-# silent:  always stops backspace processing (baked/full mode)
-#          these keys generally do not emit output in the text and cannot be processed
-# spaced:  strong spacing is required around the symbol
+import gettext
+_ = gettext.gettext
+
+### Key replacement data:
+## bk_stop
+# stops backspace processing in baked mode, but not full mode these
+# keys generally move the caret, and are also padded with a thin space
+## silent
+# always stops backspace processing (baked/full mode) these keys
+# generally do not emit output in the text and cannot be processed
+## spaced
+# strong spacing is required around the symbol
 
 ReplData = namedtuple('ReplData', ['value', 'font'])
 KeyRepl  = namedtuple('KeyRepl',  ['bk_stop', 'silent', 'spaced', 'repl'])
@@ -143,8 +147,11 @@ def keysym_to_mod(keysym):
 
 
 class LabelManager(object):
-    def __init__(self, listener, logger, key_mode, bak_mode, mods_mode, mods_only,
-                 multiline, vis_shift, vis_space, recent_thr, compr_cnt, ignore, pango_ctx):
+    def __init__(
+            self,
+            listener, logger, key_mode, bak_mode, mods_mode, mods_only,
+            multiline, vis_shift, vis_space, recent_thr, compr_cnt, ignore, pango_ctx
+    ):
         self.key_mode = key_mode
         self.bak_mode = bak_mode
         self.mods_mode = mods_mode
@@ -195,12 +202,12 @@ class LabelManager(object):
             repl = [repl]
         for c in repl:
             if type(c) != ReplData:
-                return unicode(glib.markup_escape_text(c))
+                return GLib.markup_escape_text(c)
             if c.font is None:
-                return unicode(glib.markup_escape_text(c.value))
+                return GLib.markup_escape_text(c.value)
             elif c.font in self.font_families:
                 return '<span font_family="' + c.font + '">' + \
-                    unicode(glib.markup_escape_text(c.value)) + '</span>'
+                    GLib.markup_escape_text(c.value) + '</span>'
 
     def update_replacement_map(self):
         self.replace_syms = {}
@@ -347,7 +354,7 @@ class LabelManager(object):
                 return False
             else:
                 repl = event.string or event.symbol
-                markup = unicode(glib.markup_escape_text(repl))
+                markup = GLib.markup_escape_text(repl)
                 key_repl = KeyRepl(False, False, len(repl) > 1, markup)
 
         if event.modifiers['shift'] and \

@@ -1,11 +1,13 @@
-import gettext
-gettext.install('screenkey', unicode=True)
+#!/usr/bin/env python3
 
-# Screenkey version
+import gettext
+gettext.install('screenkey')
+_ = gettext.gettext
+
 APP_NAME = "Screenkey"
 APP_DESC = _("Screencast your keys")
-APP_URL = 'http://www.thregr.org/~wavexx/software/screenkey/'
-VERSION = '0.9'
+APP_URL  = 'http://www.thregr.org/~wavexx/software/screenkey/'
+VERSION  = '0.9'
 
 # CLI/Interface options
 POSITIONS = {
@@ -39,10 +41,3 @@ MODS_MODES = {
     'emacs': _('Emacs'),
     'mac': _('Mac'),
 }
-
-class Options(dict):
-    def __getattr__(self, k):
-        return self[k]
-
-    def __setattr__(self, k, v):
-        self[k] = v

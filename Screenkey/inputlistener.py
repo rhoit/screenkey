@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
-# Distributed under the GNU GPLv3+ license, WITHOUT ANY WARRANTY.
-# Copyright(c) 2015: wave++ "Yuri D'Elia" <wavexx@thregr.org>
-#
+#!/usr/bin/env python3
+
 # Outputting translated X11 keystrokes is not a simple problem as soon as XIM
 # is introduced: getting an updated keyboard/modifier map is not enough to
 # replicate the [complex] logic hidden in the input method.
@@ -29,17 +27,12 @@
 # futile. Needing to use XIM directly also barred pure-python equivalents. As
 # a result, we have to drop back to ctypes for _extra_ phun.
 #
-# Drop me a line if you ever find this comment helpful, as finding a decent
-# solution was not trivial -- YD 21/08/2015.
+# Drop me a line if you ever find this comment helpful, as finding a
+# decent solution was not trivial -- "Yuri D'Elia" <wavexx@thregr.org>
+# 21/08/2015.
 
-from __future__ import unicode_literals, absolute_import
-
-if __name__ == '__main__':
-    import xlib
-    import keysyms
-else:
-    from . import xlib
-    from . import keysyms
+import xlib
+import keysyms
 
 import sys
 if sys.version_info.major < 3:

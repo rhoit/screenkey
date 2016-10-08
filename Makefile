@@ -1,0 +1,2 @@
+run:
+	./screenkey --no-detach
