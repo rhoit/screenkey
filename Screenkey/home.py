@@ -13,19 +13,6 @@ from threading import Timer
 from labelmanager import LabelManager
 
 
-def geometry(string):
-    size = re.match(r'^(\d+)x(\d+)(\+\d+\+\d+)?$', string)
-    if size is None:
-        raise TypeError
-    wh = [int(size.group(1)), int(size.group(2))]
-    if size.group(3) is None:
-        xy = [0, 0]
-    else:
-        pos = re.match(r'^\+(\d+)\+(\d+)$', size.group(3))
-        xy = [int(pos.group(1)), int(pos.group(2))]
-    return xy + wh
-
-
 class Home(Gtk.Window):
     def __init__(self, cnf, logger):
         Gtk.Window.__init__(self, Gtk.WindowType.POPUP)
@@ -40,12 +27,13 @@ class Home(Gtk.Window):
         self.labelmngr = None
 
         self.width, self.height = self.get_size()
+        self.set_active_monitor(self.cnf['screen'])
+        self.font = Pango.FontDescription()
+
         self.makeWidgets()
-
-        self.on_change_mode()
-        if self.cnf['persist']:
-            self.show()
-
+        self.customizeWindow()
+        self.start_labelmanager()
+        self.on_label_change("Screencast your keys")
         self.show_all()
 
 
@@ -58,11 +46,25 @@ class Home(Gtk.Window):
         self.label = Gtk.Label()
         self.add(self.label)
 
-        self.label.set_ellipsize(Pango.EllipsizeMode.START)
-        self.label.set_padding(self.width // 100, 0)
+        self.label.set_padding(20, 0)
         self.label.set_justify(Gtk.Justification.CENTER)
+        self.label.set_ellipsize(Pango.EllipsizeMode.START)
         self.label_set_apperance()
 
+
+    def label_set_apperance(self):
+        self.font.set_family(self.cnf['font_family'])
+        self.font.set_weight(self.cnf['font_weight'])
+        self.font.set_size(Pango.SCALE * self.cnf['font_size'])
+
+        self.label.modify_font(self.font)
+        self.label.override_color(
+            Gtk.StateFlags.NORMAL,
+            Gdk.RGBA(*self.cnf['foreground'])
+        )
+
+
+    def customizeWindow(self):
         self.set_gravity(Gdk.Gravity.CENTER)
         self.set_keep_above(True)
         self.set_accept_focus(False)
@@ -77,13 +79,13 @@ class Home(Gtk.Window):
             self.set_app_paintable(True)
             self.connect("draw", self.cario_draw)
 
-        # screen.connect("size-changed", self.on_configure)
         # self.connect("configure-event", self.on_configure)
-        self.set_active_monitor(self.cnf['screen'])
-        screen.connect(
-            "monitors-changed",
-            lambda *a: self.set_active_monitor(self.monitor)
-        )
+        # screen.connect(
+        #     "monitors-changed",
+        #     lambda *a: self.set_active_monitor(self.monitor)
+        # )
+        # screen.connect("size-changed", self.set_geometry)
+        self.set_geometry()
 
 
     def cario_draw(self, widget, cr):
@@ -94,26 +96,9 @@ class Home(Gtk.Window):
 
 
     def set_active_monitor(self, monitor):
-        scr = self.get_screen()
-        if monitor >= scr.get_n_monitors():
-            self.monitor = 0
-        else:
-            self.monitor = monitor
-        self.update_geometry()
-
-
-    def label_set_apperance(self):
-        self.font = Pango.FontDescription()
-        self.font.set_family(self.cnf['font_family'])
-        self.font.set_weight(self.cnf['font_weight'])
-        self.font.set_size(Pango.SCALE * self.cnf['font_size'])
-        self.font.set_size(Pango.SCALE * self.cnf['font_size'])
-
-        self.label.modify_font(self.font)
-        self.label.override_color(
-            Gtk.StateFlags.NORMAL,
-            Gdk.RGBA(*self.cnf['foreground'])
-        )
+        screen = self.get_screen()
+        self.monitor = 0 if monitor >= screen.get_n_monitors() else 0
+        self.set_geometry()
 
 
     def update_geometry(self, configure=False):
@@ -159,10 +144,10 @@ class Home(Gtk.Window):
 
 
     def on_timeout_main(self):
-        if not self.cnf['persist']:
-            self.hide()
         self.label.set_text('')
         self.labelmngr.clear()
+        if not self.cnf['persist']:
+            self.hide()
 
 
     def on_timeout_min(self):
@@ -173,12 +158,7 @@ class Home(Gtk.Window):
         # self.label.set_attributes(attr_lst)
 
 
-    def restart_labelmanager(self):
-        self.logger.debug("Restart LabelManager")
-
-        if self.labelmngr:
-            self.labelmngr.stop()
-
+    def start_labelmanager(self):
         self.labelmngr = LabelManager(
             self.on_label_change,
             logger     = self.logger,
@@ -200,4 +180,8 @@ class Home(Gtk.Window):
     def on_change_mode(self):
         if not self.enabled:
             return
-        self.restart_labelmanager()
+
+        if self.labelmngr:
+            self.labelmngr.stop()
+        self.logger.debug("Restart LabelManager")
+        self.start_labelmanager()

@@ -84,7 +84,7 @@ class TrayIcon(Gtk.StatusIcon):
         self.menu.append(menuitem_preferences)
 
         menuitem_about =  Gtk.MenuItem("About")
-        menuitem_about.connect("activate", lambda *a: create_about_dialog(self.app))
+        menuitem_about.connect("activate", lambda *a: create_about_dialog(self.app.home))
         self.menu.append(menuitem_about)
 
         menuitem_separator = Gtk.SeparatorMenuItem()
@@ -253,8 +253,8 @@ def parse_args():
     return ap
 
 
-def create_about_dialog(parent):
-    about = Gtk.AboutDialog()
+def create_about_dialog(parent=None):
+    about = Gtk.AboutDialog(parent=parent)
     about.set_position(Gtk.WindowPosition.CENTER)
     about.set_icon_name('preferences-desktop-keyboard-shortcuts')
     about.set_program_name(__PKG_NAME__)
