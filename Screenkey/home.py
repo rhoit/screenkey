@@ -101,17 +101,13 @@ class Home(Gtk.Window):
         self.set_geometry()
 
 
-    def update_geometry(self, configure=False):
-        if self.cnf['position'] == 'fixed' and self.cnf['geometry'] is not None:
-            self.move(*self.cnf['geometry'][0:2])
-            self.resize(*self.cnf['geometry'][2:4])
+    def set_geometry(self, geometry=None):
+        if geometry:
+            self.home.parse_geometry(geometry)
             return
 
-        if self.cnf['geometry'] is not None:
-            area_geometry = self.cnf['geometry']
-        else:
-            geometry = self.get_screen().get_monitor_geometry(self.monitor)
-            area_geometry = [geometry.x, geometry.y, geometry.width, geometry.height]
+        geometry = self.get_screen().get_monitor_geometry(self.monitor)
+        area_geometry = [geometry.x, geometry.y, geometry.width, geometry.height]
 
         window_height = self.cnf['font_size'] * area_geometry[3] // 200
         self.resize(area_geometry[2], window_height)
@@ -125,22 +121,35 @@ class Home(Gtk.Window):
         self.move(area_geometry[0], window_y)
 
 
+    def _timeout(self, time, func, obj=None):
+        if obj: obj.cancel()
+        if time <= 0: return
+        obj = Timer(time, func)
+        obj.start()
+        return obj
+
+
     def on_label_change(self, markup):
         r, attr, text, *z = Pango.parse_markup(markup, -1, '\000')
         self.label.set_text(text)
         self.label.set_attributes(attr)
 
         if not self.get_property('visible'):
+            # self.set_geometry() # if enter is pressed and not traslated
             self.show()
-        if self.timer_hide:
-            self.timer_hide.cancel()
-        if self.cnf['timeout'] > 0:
-            self.timer_hide = Timer(self.cnf['timeout'], self.on_timeout_main)
-            self.timer_hide.start()
-        if self.timer_min:
-            self.timer_min.cancel()
-        self.timer_min = Timer(self.cnf['recent_thr'] * 2, self.on_timeout_min)
-        self.timer_min.start()
+
+        self.timer_hide = self._timeout(
+            self.cnf['timeout'],
+            self.on_timeout_main,
+            self.timer_hide
+        )
+
+        self.timer_min = self._timeout(
+            self.cnf['recent_thr'],
+            self.on_timeout_min,
+            self.timer_min
+        )
+
 
 
     def on_timeout_main(self):
@@ -151,10 +160,10 @@ class Home(Gtk.Window):
 
 
     def on_timeout_min(self):
-        attr_lst = self.label.get_attributes()
-        # attr = Pango.Attribute(Pango.Underline.NONE, 0, -1)
-        # attr_lst.change(attr)
+        attr = Pango.Attribute()
         # attr_lst.change(Pango.Underline.NONE)
+        # attr_lst.change(attr)
+        # attr_lst = self.label.get_attributes()
         # self.label.set_attributes(attr_lst)
 
 

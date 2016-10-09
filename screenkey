@@ -46,7 +46,7 @@ cnf = {
     'opacity'    : 0.8,
     'persist'    : False,
     'position'   : 'bottom',
-    'recent_thr' : 0.1,
+    'recent_thr' : 0.2,
     'screen'     : 0,
     'timeout'    : 2.5,
     'vis_shift'  : False,
