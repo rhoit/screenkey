@@ -140,16 +140,10 @@ class Home(Gtk.Window):
         self.move(area_geometry[0], window_y)
 
 
-    def show(self):
-        self.update_geometry()
-        super().show()
-
-
     def on_label_change(self, markup):
         r, attr, text, *z = Pango.parse_markup(markup, -1, '\000')
         self.label.set_text(text)
-        # self.override_font_attributes(attr, text)
-        # self.label.set_attributes(attr)
+        self.label.set_attributes(attr)
 
         if not self.get_property('visible'):
             self.show()
