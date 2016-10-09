@@ -161,7 +161,7 @@ class InputType:
 
 class InputListener(threading.Thread):
     def __init__(self, callback, input_types=InputType.all, kbd_compose=True, kbd_translate=True):
-        super(InputListener, self).__init__()
+        super().__init__()
         self.callback = callback
         self.input_types = input_types
         self.kbd_compose = kbd_compose

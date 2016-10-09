@@ -17,12 +17,6 @@ POSITIONS = {
     'fixed': _('Fixed'),
 }
 
-FONT_SIZES = {
-    'large': _('Large'),
-    'medium': _('Medium'),
-    'small': _('Small'),
-}
-
 KEY_MODES = {
     'composed': _('Composed'),
     'translated': _('Translated'),

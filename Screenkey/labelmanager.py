@@ -182,7 +182,7 @@ class LabelManager(object):
         translate = (self.key_mode in ['composed', 'translated'])
         self.kl = InputListener(self.key_press, InputType.keyboard, compose, translate)
         self.kl.start()
-        self.logger.debug("Thread started.")
+        self.logger.debug("Thread started")
 
 
     def stop(self):
@@ -208,6 +208,7 @@ class LabelManager(object):
             elif c.font in self.font_families:
                 return '<span font_family="' + c.font + '">' + \
                     GLib.markup_escape_text(c.value) + '</span>'
+
 
     def update_replacement_map(self):
         self.replace_syms = {}

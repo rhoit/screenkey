@@ -14,52 +14,182 @@ PWD = os.path.dirname(__filepath__) + '/'
 sys.path.append(PWD)
 sys.path.append(PWD + '/Screenkey')
 
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, GLib, Pango
+
 import Screenkey
-from Screenkey import screenkey as sc
+from Screenkey import home
 
 import logging
-import os
 import re
 import argparse
+import signal
+
+FILE_INI = os.path.join(GLib.get_user_config_dir(), 'screenkey.json')
+
+cnf = {
+    'bak_mode'   : 'baked',
+    'background' : [.2, .2, .2, .8 ],
+    'compr_cnt'  : 3,
+    'foreground' : [1, 1, 1, 1],
+    'font_family': 'Sans',
+    'font_weight': Pango.Weight.BOLD,
+    'font_size'  : 24,
+    'geometry'   : None,
+    'ignore'     : [],
+    'key_mode'   : 'composed',
+    'mods_mode'  : 'normal',
+    'mods_only'  : False,
+    'multiline'  : False,
+    'no_systray' : False,
+    'opacity'    : 0.8,
+    'persist'    : False,
+    'position'   : 'bottom',
+    'recent_thr' : 0.1,
+    'screen'     : 0,
+    'timeout'    : 2.5,
+    'vis_shift'  : False,
+    'vis_space'  : True,
+}
 
 
-def detach():
-    if os.fork() != 0:
-        os._exit(0)
-    os.setsid()
-    if os.fork() != 0:
-        os._exit(0)
-    os.close(0)
+class TrayIcon(Gtk.StatusIcon):
+    def __init__(self, app):
+        Gtk.StatusIcon.__init__(self)
+        self.app = app
+        self.makeWidget()
+        self.connect("activate", self.toggle_enable)
+        self.connect("popup_menu", self.on_secondary_click)
 
 
-def geometry(string):
-    size = re.match(r'^(\d+)x(\d+)(\+\d+\+\d+)?$', string)
-    if size is None:
-        raise TypeError
-    wh = [int(size.group(1)), int(size.group(2))]
-    if size.group(3) is None:
-        xy = [0, 0]
-    else:
-        pos = re.match(r'^\+(\d+)\+(\d+)$', size.group(3))
-        xy = [int(pos.group(1)), int(pos.group(2))]
-    return xy + wh
+    def makeWidget(self):
+        self.set_from_icon_name("preferences-desktop-keyboard-shortcuts")
+        self.set_title(__PKG_NAME__)
+        # self.set_name(__PKG_ID__ + ".tray")
+        ## BUG: don't use it ^^^ will create Gdk-CRITICAL
+        self.set_tooltip_text(__PKG_DESC__)
+        self.set_has_tooltip(True)
+        self.set_visible(True)
+
+        self.menu = Gtk.Menu()
+
+        self.menuitem_enable = Gtk.CheckMenuItem("Enable / Disable")
+        self.menuitem_enable.set_active(True)
+        self.menuitem_enable.connect("toggled", self.toggle_enable)
+        self.menu.append(self.menuitem_enable)
+
+        menuitem_preferences = Gtk.MenuItem("Preferences")
+        # menuitem_preferences.connect("activate", self.on_preferences_dialog)
+        self.menu.append(menuitem_preferences)
+
+        menuitem_about =  Gtk.MenuItem("About")
+        menuitem_about.connect("activate", lambda *a: create_about_dialog(self.app))
+        self.menu.append(menuitem_about)
+
+        menuitem_separator = Gtk.SeparatorMenuItem()
+        self.menu.append(menuitem_separator)
+
+        menuitem_quit = Gtk.MenuItem("Quit")
+        # menuitem_quit.connect("activate", lambda *a: self.app.quit())
+        menuitem_quit.connect("activate", self.quit)
+        self.menu.append(menuitem_quit)
+        self.menu.show_all()
 
 
-def main():
+    def quit(self, *args):
+        self.app.home.quit()
+        self.app.quit()
+        exit()
+
+
+    def toggle_enable(self, widget):
+        if self.menuitem_enable.get_active():
+            # self.logger.debug("Screenkey disabled.")
+            # self.labelmngr.stop()
+            return
+
+        # self.logger.debug("Screenkey enabled.")
+        # self.restart_labelmanager()
+        # self.app.home.hide()
+
+
+    def on_secondary_click(self, widget, button, time):
+        self.menu.popup(None, None, None, self, 3, time)
+
+
+class App(Gtk.Application):
+    def __init__(self, opts):
+        Gtk.Application.__init__(
+            self,
+            application_id = __PKG_ID__,
+        )
+
+        self.opts = opts
+        self.home = None
+        self.connect("shutdown", self.on_shutdown)
+        ## BUG: dont use =do_shutdown= virtual func, creates show
+        ## CRITIAL error messages
+
+
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        # self.cnf = setting.main(PWD)
+
+
+    def do_activate(self):
+        if self.home == None:
+            # Initialize logger
+            logging.basicConfig(level=logging.DEBUG)
+            logger = logging.getLogger(__PKG_NAME__)
+
+            self.home = home.Home(self.opts, logger)
+            self.add_window(self.home)
+            if not self.opts['no_systray']:
+                self.tray = TrayIcon(self)
+
+        # self.home.show()
+        # self.home.parse_geometry(self.cnf.gui['geometry'])
+        # self.home.present()
+
+
+    def on_shutdown(self, app_obj):
+        pass
+        # if self.home and self.cnf.preferences['enable-history-file']:
+        #     print("shutdown: update history")
+        #     with open(os.path.expanduser(setting.FILE_HIST), mode='w+') as fp:
+        #         fp.write('\n'.join(self.home.searchbar.entry.HISTORY))
+
+
+    def load_state(self):
+        """Load stored options"""
+        options = None
+        try:
+            with open(self.STATE_FILE, 'r') as f:
+                options = Options(json.load(f))
+                self.logger.debug("Options loaded.")
+        except IOError:
+            self.logger.debug("file %s does not exists." % self.STATE_FILE)
+        except ValueError:
+            self.logger.debug("file %s is invalid." % self.STATE_FILE)
+
+        return options
+
+
+    def store_state(self, options):
+        """Store options"""
+        try:
+            with open(self.STATE_FILE, 'w') as f:
+                json.dump(options, f)
+                self.logger.debug("Options saved.")
+        except IOError:
+            self.logger.debug("Cannot open %s." % self.STATE_FILE)
+
+
+def parse_args():
     ap = argparse.ArgumentParser(
         prog = Screenkey.APP_NAME,
         description = Screenkey.APP_DESC
-    )
-    ap.add_argument(
-        "--no-detach",
-        action = "store_true",
-        help = _("do not detach from the parent")
-    )
-
-    ap.add_argument(
-        "-d", "--debug",
-        action = "store_true",
-        help = _("enable debugging (implies --no-detach)")
     )
 
     ap.add_argument(
@@ -70,68 +200,10 @@ def main():
     )
 
     ap.add_argument(
-        "-t", "--timeout",
-        type = float,
-        default = 2.5,
-        help = _("timeout in seconds")
-    )
-
-    ap.add_argument(
-        "-p", "--position",
-        choices = Screenkey.POSITIONS,
-        default = 'bottom',
-        help=_("set vertical position")
-    )
-
-    ap.add_argument(
         "--persist",
         action = 'store_true',
         default = None,
         help = _("make window persistent")
-    )
-
-    ap.add_argument(
-        "-s", "--font-size",
-        choices = Screenkey.FONT_SIZES,
-        help = _("set font size")
-    )
-    ap.add_argument(
-        "-g", "--geometry",
-        type = geometry,
-        help = _("set fixed area/window geometry")
-    )
-
-    ap.add_argument(
-        "--key-mode",
-        choices = Screenkey.KEY_MODES,
-        help = _("set key processing mode")
-    )
-
-    ap.add_argument(
-        "--bak-mode",
-        choices = Screenkey.BAK_MODES,
-        help = _("backspace processing mode")
-    )
-
-    ap.add_argument(
-        "--mods-mode",
-        choices = Screenkey.MODS_MODES,
-        default = 'normal',
-        help = _("modifiers visualization mode")
-    )
-
-    ap.add_argument(
-        "-m", "--mods-only",
-        action = "store_true",
-        default = None,
-        help = _("show only keys with modifiers pressed")
-    )
-
-    ap.add_argument(
-        "--multiline",
-        action = "store_true",
-        default = None,
-        help = _("span text over multiple lines")
     )
 
     ap.add_argument(
@@ -164,31 +236,6 @@ def main():
     )
 
     ap.add_argument(
-        "-f", "--font",
-        dest = 'font_desc',
-        help = _("set font family/weight")
-    )
-
-    ap.add_argument(
-        "--font-color",
-        dest = 'font_color',
-        help = _("set font color")
-    )
-
-    ap.add_argument(
-        "--bg-color",
-        dest = 'bg_color',
-        help = _("background color")
-    )
-
-    ap.add_argument(
-        "--opacity",
-        dest = 'opacity',
-        type = float,
-        help = _("window opacity (in range 0.0-1.0)")
-    )
-
-    ap.add_argument(
         "--ignore",
         action = 'append',
         metavar = 'KeySym',
@@ -203,59 +250,47 @@ def main():
         help = _("Compress key repeats after the specified count")
     )
 
-    # Set options
-    options = {
-        'bak_mode'   : 'baked',
-        'bg_color'   : 'black',
-        'compr_cnt'  : 3,
-        'font_color' : 'white',
-        'font_desc'  : 'Sans Bold',
-        'font_size'  : 'medium',
-        'geometry'   : None,
-        'ignore'     : [],
-        'key_mode'   : 'composed',
-        'mods_mode'  : 'normal',
-        'mods_only'  : False,
-        'multiline'  : False,
-        'no_systray' : False,
-        'opacity'    : 0.8,
-        'persist'    : False,
-        'position'   : 'bottom',
-        'screen'     : 0,
-        'timeout'    : 2.5,
-        'vis_shift'  : False,
-        'vis_space'  : True,
-    }
+    return ap
 
-    args = ap.parse_args()
-    for arg in options.keys():
-        if getattr(args, arg) is not None:
-            options[arg] = getattr(args, arg)
 
-    options['recent_thr'] = 0.1
-
-    # Initialize logger
-    if args.debug:
-        args.no_detach = True
-        logging.basicConfig(level=logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(Screenkey.APP_NAME)
-
-    if args.no_detach == False:
-        detach()
-
-    sc.Home(
-        logger = logger,
-        options = options,
-        show_settings = args.show_settings
+def create_about_dialog(parent):
+    about = Gtk.AboutDialog()
+    about.set_position(Gtk.WindowPosition.CENTER)
+    about.set_icon_name('preferences-desktop-keyboard-shortcuts')
+    about.set_program_name(__PKG_NAME__)
+    about.set_version(__version__)
+    about.set_copyright("""
+    Copyright(c) 2010-2012: Pablo Seminario <pabluk@gmail.com>
+    Copyright(c) 2015-2016: wave++ "Yuri D'Elia" <wavexx@thregr.org>
+    """)
+    about.set_documenters(
+        ["José María Quiroga <pepelandia@gmail.com>"]
     )
+    about.set_website(Screenkey.APP_URL)
 
-    try:
-        sc.run()
-    except KeyboardInterrupt:
-        os._exit(0)
+    # about.connect("response", about.hide_on_delete)
+    # about.connect("delete-event", about.hide_on_delete)
+    # about.set_authors(open(PWD + '../AUTHORS').read().splitlines())
+    # about.set_license(open(PWD + '../LICENSE').read())
+    about.run()
+    about.destroy()
+
+
+
+def main():
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    ap = parse_args()
+    opts, *z = ap.parse_known_args()
+
+    for k in cnf.keys():
+        if not hasattr(opts, k): continue
+        val = getattr(opts, k)
+        if val is None: continue
+        cnf[k] = val
+
+    return App(cnf)
 
 
 if __name__ == "__main__":
-    main()
+    app = main()
+    app.run()
